@@ -34,15 +34,15 @@ impl TelnetServer {
                         self.write_handle = match stream.try_clone() {
                             Ok(handle) => Some(handle),
                             Err(err) => {
-                                println!("failed to clone a TCP stream: {:?}", err);
+                                eprintln!("failed to clone a TCP stream: {:?}", err);
                                 continue;
                             }
                         };
                         if let Err(err) = self.handle_client(&mut stream) {
-                            println!("TCP connection dropped: {:?}", err);
+                            eprintln!("TCP connection dropped: {:?}", err);
                         }
                     }
-                    Err(err) => println!("failed to unpack a new TCP stream: {:?}", err),
+                    Err(err) => eprintln!("failed to unpack a new TCP stream: {:?}", err),
                 }
             }
 

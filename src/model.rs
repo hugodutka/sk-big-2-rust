@@ -26,7 +26,7 @@ impl Model {
                 Event::TelnetServerCrashed(msg) => {
                     return Err(anyhow!("telnet server crashed\n{}", msg))
                 }
-                Event::UserInput(input) => println!("Got {:?}", input),
+                Event::UserInput(input) => eprintln!("Got {:?}", input),
             }
         }
     }
