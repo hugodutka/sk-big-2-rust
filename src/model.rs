@@ -1,4 +1,4 @@
-use crate::channels::MODEL_R;
+use crate::channels::CHANNEL_MODEL_R;
 use crate::events::Event;
 use crate::telnet::TelnetServer;
 use anyhow::{anyhow, Result};
@@ -22,7 +22,7 @@ impl Model {
         });
 
         loop {
-            match MODEL_R.recv()? {
+            match CHANNEL_MODEL_R.recv()? {
                 Event::TelnetServerCrashed(msg) => {
                     return Err(anyhow!("telnet server crashed\n{}", msg))
                 }

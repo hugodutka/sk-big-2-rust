@@ -1,4 +1,4 @@
-use crate::channels::MODEL_S;
+use crate::channels::CHANNEL_MODEL_S;
 use crate::events::Event;
 use anyhow::{Context, Result};
 use std::io::prelude::*;
@@ -51,7 +51,7 @@ impl TelnetServer {
 
         match wrapper() {
             Ok(()) => (),
-            Err(e) => MODEL_S
+            Err(e) => CHANNEL_MODEL_S
                 .send(Event::TelnetServerCrashed(e.to_string()))
                 .unwrap(),
         }
@@ -63,7 +63,7 @@ impl TelnetServer {
             if read_size == 0 {
                 return Ok(());
             }
-            MODEL_S
+            CHANNEL_MODEL_S
                 .send(Event::UserInput(self.buffer[0..read_size].to_vec()))
                 .unwrap();
         }
