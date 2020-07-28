@@ -106,7 +106,10 @@ mod tests {
         match CHANNEL_MODEL_R.recv_timeout(Duration::from_secs(5)) {
             Ok(EventModel::UserInput(recv_input)) => match &recv_input[..] {
                 INPUT => Ok(()),
-                _ => Err(anyhow!("wrong user input received")),
+                _ => Err(anyhow!(format!(
+                    "wrong user input received: {:?}",
+                    recv_input
+                ))),
             },
             _ => Err(anyhow!("expected a user input event")),
         }
