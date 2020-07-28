@@ -1,5 +1,5 @@
 use crate::channels::CHANNEL_MODEL_S;
-use crate::events::Event;
+use crate::events::EventModel;
 use anyhow::{Context, Result};
 use std::io::prelude::*;
 use std::net::{TcpListener, TcpStream};
@@ -34,15 +34,15 @@ impl TelnetServer {
                         self.write_handle = match stream.try_clone() {
                             Ok(handle) => Some(handle),
                             Err(err) => {
-                                eprintln!("failed to clone a TCP stream: {:?}", err);
+                                log!("failed to clone a TCP stream: {:?}", err);
                                 continue;
                             }
                         };
                         if let Err(err) = self.handle_client(&mut stream) {
-                            eprintln!("TCP connection dropped: {:?}", err);
+                            log!("TCP connection dropped: {:?}", err);
                         }
                     }
-                    Err(err) => eprintln!("failed to unpack a new TCP stream: {:?}", err),
+                    Err(err) => log!("failed to unpack a new TCP stream: {:?}", err),
                 }
             }
 
@@ -52,7 +52,7 @@ impl TelnetServer {
         match wrapper() {
             Ok(()) => (),
             Err(e) => CHANNEL_MODEL_S
-                .send(Event::TelnetServerCrashed(e.to_string()))
+                .send(EventModel::TelnetServerCrashed(e.to_string()))
                 .unwrap(),
         }
     }
@@ -64,7 +64,7 @@ impl TelnetServer {
                 return Ok(());
             }
             CHANNEL_MODEL_S
-                .send(Event::UserInput(self.buffer[0..read_size].to_vec()))
+                .send(EventModel::UserInput(self.buffer[0..read_size].to_vec()))
                 .unwrap();
         }
     }

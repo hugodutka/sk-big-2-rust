@@ -1,5 +1,6 @@
 use crate::channels::CHANNEL_MODEL_R;
-use crate::events::Event;
+use crate::events::EventModel;
+use crate::log::begin_logging;
 use crate::telnet::TelnetServer;
 use anyhow::{anyhow, Result};
 use std::thread;
@@ -16,6 +17,8 @@ impl Model {
     pub fn start(&self) -> Result<()> {
         let telnet_port = self.telnet_port;
 
+        thread::spawn(|| begin_logging());
+
         thread::spawn(move || {
             let mut telnet_server = TelnetServer::new("127.0.0.1".to_string(), telnet_port);
             telnet_server.start();
@@ -23,10 +26,10 @@ impl Model {
 
         loop {
             match CHANNEL_MODEL_R.recv()? {
-                Event::TelnetServerCrashed(msg) => {
+                EventModel::TelnetServerCrashed(msg) => {
                     return Err(anyhow!("telnet server crashed\n{}", msg))
                 }
-                Event::UserInput(input) => eprintln!("Got {:?}", input),
+                EventModel::UserInput(input) => eprintln!("Got {:?}", input),
             }
         }
     }

@@ -3,6 +3,7 @@ use std::{panic, process};
 
 mod channels;
 mod events;
+mod log;
 mod model;
 mod telnet;
 
