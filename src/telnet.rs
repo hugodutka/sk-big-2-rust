@@ -26,7 +26,7 @@ impl TelnetServer {
     pub fn start(&mut self) {
         let mut wrapper = || -> Result<()> {
             let listener =
-                TcpListener::bind(format!("{}:{}", self.host, self.port)).context("bind failed")?;
+                TcpListener::bind((self.host.as_str(), self.port)).context("bind failed")?;
 
             for stream in listener.incoming() {
                 match stream {
@@ -66,6 +66,48 @@ impl TelnetServer {
             CHANNEL_MODEL_S
                 .send(EventModel::UserInput(self.buffer[0..read_size].to_vec()))
                 .unwrap();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::channels::CHANNEL_MODEL_R;
+    use anyhow::{anyhow, Result};
+    use std::thread;
+    use std::time::Duration;
+
+    static SERVER_HOST: &'static str = "localhost";
+    static SERVER_PORT: u16 = 16789;
+
+    #[test]
+    fn start_sends_crash_event() -> Result<()> {
+        thread::spawn(|| TelnetServer::new("invalidhost".to_string(), 0).start());
+        match CHANNEL_MODEL_R.recv_timeout(Duration::from_secs(5)) {
+            Ok(EventModel::TelnetServerCrashed(_)) => Ok(()),
+            _ => Err(anyhow!("expected the telnet server to crash")),
+        }
+    }
+
+    #[test]
+    fn handle_client_sends_user_input_event() -> Result<()> {
+        thread::spawn(|| TelnetServer::new(SERVER_HOST.to_string(), SERVER_PORT).start());
+        const INPUT: &'static [u8] = &[1, 2, 3, 4, 5];
+        let mut stream = TcpStream::connect((SERVER_HOST, SERVER_PORT))?;
+        for _ in 0..10 {
+            match stream.write_all(&INPUT) {
+                Ok(_) => break,
+                _ => thread::sleep(Duration::from_millis(50)),
+            }
+        }
+
+        match CHANNEL_MODEL_R.recv_timeout(Duration::from_secs(5)) {
+            Ok(EventModel::UserInput(recv_input)) => match &recv_input[..] {
+                INPUT => Ok(()),
+                _ => Err(anyhow!("wrong user input received")),
+            },
+            _ => Err(anyhow!("expected the telnet server to crash")),
         }
     }
 }
