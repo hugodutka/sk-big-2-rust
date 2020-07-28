@@ -24,7 +24,7 @@ impl TelnetServer {
     }
 
     pub fn start(&mut self) {
-        let mut wrapper = || -> Result<()> {
+        match || -> Result<()> {
             let listener =
                 TcpListener::bind((self.host.as_str(), self.port)).context("bind failed")?;
 
@@ -47,9 +47,7 @@ impl TelnetServer {
             }
 
             Ok(())
-        };
-
-        match wrapper() {
+        }() {
             Ok(()) => (),
             Err(e) => CHANNEL_MODEL_S
                 .send(EventModel::TelnetServerCrashed(e.to_string()))
