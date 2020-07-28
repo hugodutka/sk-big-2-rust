@@ -92,13 +92,14 @@ mod tests {
 
     #[test]
     fn handle_client_sends_user_input_event() -> Result<()> {
-        thread::spawn(|| TelnetServer::new(SERVER_HOST.to_string(), SERVER_PORT).start());
         const INPUT: &'static [u8] = &[1, 2, 3, 4, 5];
-        let mut stream = TcpStream::connect((SERVER_HOST, SERVER_PORT))?;
+
+        thread::spawn(|| TelnetServer::new(SERVER_HOST.to_string(), SERVER_PORT).start());
+
         for _ in 0..10 {
-            match stream.write_all(&INPUT) {
-                Ok(_) => break,
-                _ => thread::sleep(Duration::from_millis(50)),
+            match TcpStream::connect((SERVER_HOST, SERVER_PORT)) {
+                Ok(mut stream) => stream.write_all(&INPUT)?,
+                Err(_) => thread::sleep(Duration::from_millis(50)),
             }
         }
 
@@ -107,7 +108,7 @@ mod tests {
                 INPUT => Ok(()),
                 _ => Err(anyhow!("wrong user input received")),
             },
-            _ => Err(anyhow!("expected the telnet server to crash")),
+            _ => Err(anyhow!("expected a user input event")),
         }
     }
 }
