@@ -71,25 +71,19 @@ impl TelnetServer<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::channels::tests::channel_test;
     use crate::channels::CHANNEL_MODEL_R;
+    use adorn::adorn;
     use anyhow::{anyhow, Result};
-    use lazy_static::lazy_static;
-    use std::sync::Mutex;
     use std::thread;
     use std::time::Duration;
 
     static SERVER_HOST: &'static str = "localhost";
     static SERVER_PORT: u16 = 16789;
-    lazy_static! {
-        // This mutex is required because all tests put events on the global CHANNEL_MODEL_R, and
-        // at least some expect to be the only ones doing that
-        static ref TEST_MUTEX: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
-    }
 
     #[test]
+    #[adorn(channel_test)]
     fn start_sends_crash_event() -> Result<()> {
-        let _guard = TEST_MUTEX.lock().unwrap();
-
         thread::spawn(|| TelnetServer::new("invalidhost", 0).start());
         match CHANNEL_MODEL_R.recv_timeout(Duration::from_secs(5)) {
             Ok(EventModel::TelnetServerCrashed(_)) => Ok(()),
@@ -102,9 +96,8 @@ mod tests {
     }
 
     #[test]
+    #[adorn(channel_test)]
     fn handle_client_sends_user_input_event() -> Result<()> {
-        let _guard = TEST_MUTEX.lock().unwrap();
-
         const INPUT: &'static [u8] = &[1, 2, 3, 4, 5];
 
         thread::spawn(|| TelnetServer::new(SERVER_HOST, SERVER_PORT).start());
