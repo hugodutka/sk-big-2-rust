@@ -3,18 +3,19 @@ use crate::events::EventModel;
 use anyhow::{Context, Result};
 use std::io::prelude::*;
 use std::net::{TcpListener, TcpStream};
+use std::sync::Arc;
 
 const BUFFER_SIZE: usize = 1024;
 
-pub struct TelnetServer {
-    host: String,
+pub struct TelnetServer<'a> {
+    host: &'a str,
     port: u16,
     write_handle: Option<TcpStream>,
     buffer: [u8; BUFFER_SIZE],
 }
 
-impl TelnetServer {
-    pub fn new(host: String, port: u16) -> TelnetServer {
+impl TelnetServer<'_> {
+    pub fn new(host: &str, port: u16) -> TelnetServer {
         TelnetServer {
             host,
             port,
@@ -25,8 +26,7 @@ impl TelnetServer {
 
     pub fn start(&mut self) {
         match || -> Result<()> {
-            let listener =
-                TcpListener::bind((self.host.as_str(), self.port)).context("bind failed")?;
+            let listener = TcpListener::bind((self.host, self.port)).context("bind failed")?;
 
             for stream in listener.incoming() {
                 match stream {
@@ -50,7 +50,7 @@ impl TelnetServer {
         }() {
             Ok(()) => (),
             Err(e) => CHANNEL_MODEL_S
-                .send(EventModel::TelnetServerCrashed(e.to_string()))
+                .send(EventModel::TelnetServerCrashed(Arc::from(e.to_string())))
                 .unwrap(),
         }
     }
@@ -62,7 +62,7 @@ impl TelnetServer {
                 return Ok(());
             }
             CHANNEL_MODEL_S
-                .send(EventModel::UserInput(self.buffer[0..read_size].to_vec()))
+                .send(EventModel::UserInput(Arc::from(&self.buffer[0..read_size])))
                 .unwrap();
         }
     }
@@ -73,30 +73,48 @@ mod tests {
     use super::*;
     use crate::channels::CHANNEL_MODEL_R;
     use anyhow::{anyhow, Result};
+    use lazy_static::lazy_static;
+    use std::sync::Mutex;
     use std::thread;
     use std::time::Duration;
 
     static SERVER_HOST: &'static str = "localhost";
     static SERVER_PORT: u16 = 16789;
+    lazy_static! {
+        // This mutex is required because all tests put events on the global CHANNEL_MODEL_R, and
+        // at least some expect to be the only ones doing that
+        static ref TEST_MUTEX: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
+    }
 
     #[test]
     fn start_sends_crash_event() -> Result<()> {
-        thread::spawn(|| TelnetServer::new("invalidhost".to_string(), 0).start());
+        let _guard = TEST_MUTEX.lock().unwrap();
+
+        thread::spawn(|| TelnetServer::new("invalidhost", 0).start());
         match CHANNEL_MODEL_R.recv_timeout(Duration::from_secs(5)) {
             Ok(EventModel::TelnetServerCrashed(_)) => Ok(()),
-            _ => Err(anyhow!("expected the telnet server to crash")),
+            Ok(event) => Err(anyhow!(
+                "expected the telnet server to crash, but got {:?}",
+                event
+            )),
+            Err(e) => Err(anyhow!("expected the telnet server to crash, {:?}", e)),
         }
     }
 
     #[test]
     fn handle_client_sends_user_input_event() -> Result<()> {
+        let _guard = TEST_MUTEX.lock().unwrap();
+
         const INPUT: &'static [u8] = &[1, 2, 3, 4, 5];
 
-        thread::spawn(|| TelnetServer::new(SERVER_HOST.to_string(), SERVER_PORT).start());
+        thread::spawn(|| TelnetServer::new(SERVER_HOST, SERVER_PORT).start());
 
         for _ in 0..10 {
             match TcpStream::connect((SERVER_HOST, SERVER_PORT)) {
-                Ok(mut stream) => stream.write_all(&INPUT)?,
+                Ok(mut stream) => {
+                    stream.write_all(&INPUT)?;
+                    break;
+                }
                 Err(_) => thread::sleep(Duration::from_millis(50)),
             }
         }

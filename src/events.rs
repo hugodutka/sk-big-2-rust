@@ -1,4 +1,7 @@
+use std::sync::Arc;
+
+#[derive(Debug)]
 pub enum EventModel {
-    UserInput(Vec<u8>),
-    TelnetServerCrashed(String),
+    UserInput(Arc<[u8]>),
+    TelnetServerCrashed(Arc<str>),
 }

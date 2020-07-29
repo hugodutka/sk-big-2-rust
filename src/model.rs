@@ -20,7 +20,7 @@ impl Model {
         thread::spawn(|| begin_logging());
 
         thread::spawn(move || {
-            let mut telnet_server = TelnetServer::new("127.0.0.1".to_string(), telnet_port);
+            let mut telnet_server = TelnetServer::new("127.0.0.1", telnet_port);
             telnet_server.start();
         });
 
