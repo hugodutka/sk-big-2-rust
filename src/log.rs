@@ -26,11 +26,7 @@ pub mod tests {
     fn log_sends_event() -> Result<()> {
         const MSG: &'static str = "test message";
         log!("{}", MSG);
-        match CHANNEL_LOG_R
-            .recv_timeout(Duration::from_secs(1))
-            .unwrap()
-            .as_str()
-        {
+        match CHANNEL_LOG_R.recv_timeout(Duration::from_secs(1))?.as_str() {
             MSG => Ok(()),
             other => Err(anyhow!("expected to receive {:?} but got {:?}", MSG, other)),
         }

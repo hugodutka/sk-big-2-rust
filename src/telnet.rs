@@ -61,9 +61,7 @@ impl TelnetServer<'_> {
             if read_size == 0 {
                 return Ok(());
             }
-            CHANNEL_MODEL_S
-                .send(EventModel::UserInput(Arc::from(&self.buffer[0..read_size])))
-                .unwrap();
+            CHANNEL_MODEL_S.send(EventModel::UserInput(Arc::from(&self.buffer[0..read_size])))?;
         }
     }
 }
