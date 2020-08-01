@@ -12,3 +12,27 @@ pub fn begin_logging() {
         eprintln!("{}", CHANNEL_LOG_R.recv().unwrap());
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::channels::tests::channel_test;
+    use adorn::adorn;
+    use anyhow::{anyhow, Result};
+    use std::time::Duration;
+
+    #[test]
+    #[adorn(channel_test)]
+    fn log_sends_event() -> Result<()> {
+        const MSG: &'static str = "test message";
+        log!("{}", MSG);
+        match CHANNEL_LOG_R
+            .recv_timeout(Duration::from_secs(1))
+            .unwrap()
+            .as_str()
+        {
+            MSG => Ok(()),
+            other => Err(anyhow!("expected to receive {:?} but got {:?}", MSG, other)),
+        }
+    }
+}
