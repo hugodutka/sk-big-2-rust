@@ -167,7 +167,7 @@ mod tests {
                     assert_eq!(INPUT, &buf[..]);
                     return Ok(());
                 }
-                Err(_) => thread::sleep(Duration::from_millis(50)),
+                Err(_) => thread::sleep(Duration::from_millis(5)),
             }
         }
 
