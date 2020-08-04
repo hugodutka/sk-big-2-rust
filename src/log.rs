@@ -16,19 +16,18 @@ pub fn begin_logging() {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::channels::tests::channel_test;
-    use adorn::adorn;
-    use anyhow::{anyhow, Result};
+    use rusty_fork::rusty_fork_test;
     use std::time::Duration;
 
-    #[test]
-    #[adorn(channel_test)]
-    fn log_sends_event() -> Result<()> {
-        const MSG: &'static str = "test message";
-        log!("{}", MSG);
-        match CHANNEL_LOG_R.recv_timeout(Duration::from_secs(1))?.as_str() {
-            MSG => Ok(()),
-            other => Err(anyhow!("expected to receive {:?} but got {:?}", MSG, other)),
+    rusty_fork_test! {
+        #[test]
+        fn log_sends_event() {
+            const MSG: &'static str = "test message";
+            log!("{}", MSG);
+            match CHANNEL_LOG_R.recv_timeout(Duration::from_secs(1)).unwrap().as_str() {
+                MSG => (),
+                other => panic!("expected to receive {:?} but got {:?}", MSG, other),
+            }
         }
     }
 }

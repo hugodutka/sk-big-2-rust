@@ -85,92 +85,86 @@ impl TelnetServer<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::channels::tests::channel_test;
     use crate::channels::{CHANNEL_MODEL_R, CHANNEL_TELNET_S};
-    use adorn::adorn;
-    use anyhow::{anyhow, Result};
+    use rusty_fork::rusty_fork_test;
     use std::thread;
     use std::time::Duration;
 
     static SERVER_HOST: &'static str = "localhost";
     static SERVER_PORT: u16 = 16789;
 
-    #[test]
-    #[adorn(channel_test)]
-    fn start_sends_crash_event() -> Result<()> {
-        thread::spawn(|| TelnetServer::new("invalidhost", 0).start());
-        match CHANNEL_MODEL_R.recv_timeout(Duration::from_secs(5)) {
-            Ok(EventModel::TelnetServerCrashed(_)) => Ok(()),
-            Ok(event) => Err(anyhow!(
-                "expected the telnet server to crash, but got {:?}",
-                event
-            )),
-            Err(e) => Err(anyhow!("expected the telnet server to crash, {:?}", e)),
-        }
-    }
-
-    #[test]
-    #[adorn(channel_test)]
-    fn handle_client_sends_user_input_event() -> Result<()> {
-        const INPUT: &'static [u8] = &[1, 2, 3, 4, 5];
-
-        thread::spawn(|| TelnetServer::new(SERVER_HOST, SERVER_PORT).start());
-
-        for _ in 0..100 {
-            match TcpStream::connect((SERVER_HOST, SERVER_PORT)) {
-                Ok(mut stream) => {
-                    stream.write_all(&INPUT)?;
-                    break;
-                }
-                Err(_) => thread::sleep(Duration::from_millis(5)),
+    rusty_fork_test! {
+        #[test]
+        fn start_sends_crash_event() {
+            thread::spawn(|| TelnetServer::new("invalidhost", 0).start());
+            match CHANNEL_MODEL_R.recv_timeout(Duration::from_secs(5)) {
+                Ok(EventModel::TelnetServerCrashed(_)) => (),
+                Ok(event) => panic!(
+                    "expected the telnet server to crash, but got {:?}",
+                    event
+                ),
+                Err(e) => panic!("expected the telnet server to crash, {:?}", e),
             }
         }
 
-        match CHANNEL_MODEL_R.recv_timeout(Duration::from_secs(5)) {
-            Ok(EventModel::UserInput(recv_input)) => match &recv_input[..] {
-                INPUT => Ok(()),
-                _ => Err(anyhow!(format!(
-                    "wrong user input received: {:?}",
-                    recv_input
-                ))),
-            },
-            _ => Err(anyhow!("expected a user input event")),
-        }
-    }
+        #[test]
+        fn handle_client_sends_user_input_event() {
+            const INPUT: &'static [u8] = &[1, 2, 3, 4, 5];
 
-    #[test]
-    #[adorn(channel_test)]
-    fn telnet_writer_reacts_to_events() -> Result<()> {
-        const INPUT: &'static [u8] = &[6, 7, 8, 9, 10];
-
-        *WRITE_HANDLE.lock().unwrap() = None;
-
-        thread::spawn(|| TelnetServer::new(SERVER_HOST, SERVER_PORT).start());
-        thread::spawn(|| TelnetServer::start_writer());
-
-        for _ in 0..100 {
-            match TcpStream::connect((SERVER_HOST, SERVER_PORT)) {
-                Ok(mut stream) => {
-                    let mut buf: [u8; INPUT.len()] = [0; INPUT.len()];
-                    for i in 0..100 {
-                        if let Some(_) = WRITE_HANDLE.lock().unwrap().as_ref() {
-                            CHANNEL_TELNET_S.send(EventTelnet::Write(Arc::from(INPUT)))?;
-                            break;
-                        }
-                        if i == 99 {
-                            return Err(anyhow!("could not obtain a write handle"));
-                        }
-                        thread::sleep(Duration::from_millis(5));
+            thread::spawn(|| TelnetServer::new(SERVER_HOST, SERVER_PORT + 1).start());
+            for _ in 0..100 {
+                match TcpStream::connect((SERVER_HOST, SERVER_PORT + 1)) {
+                    Ok(mut stream) => {
+                        stream.write_all(&INPUT).unwrap();
+                        break;
                     }
-                    stream.set_read_timeout(Some(Duration::from_secs(1)))?;
-                    stream.read_exact(&mut buf)?;
-                    assert_eq!(INPUT, &buf[..]);
-                    return Ok(());
+                    Err(_) => thread::sleep(Duration::from_millis(5)),
                 }
-                Err(_) => thread::sleep(Duration::from_millis(5)),
+            }
+
+            match CHANNEL_MODEL_R.recv_timeout(Duration::from_secs(1)) {
+                Ok(EventModel::UserInput(recv_input)) => match &recv_input[..] {
+                    INPUT => (),
+                    _ => panic!("wrong user input received: {:?}", recv_input),
+                },
+                _ => panic!("expected a user input event"),
             }
         }
 
-        return Err(anyhow!("failed to connect to tcp stream"));
+        #[test]
+        fn telnet_writer_reacts_to_events() {
+            const INPUT: &'static [u8] = &[6, 7, 8, 9, 10];
+
+            *WRITE_HANDLE.lock().unwrap() = None;
+
+            thread::spawn(|| TelnetServer::new(SERVER_HOST, SERVER_PORT + 2).start());
+            thread::spawn(|| TelnetServer::start_writer());
+
+            for _ in 0..100 {
+                match TcpStream::connect((SERVER_HOST, SERVER_PORT + 2)) {
+                    Ok(mut stream) => {
+                        let mut buf: [u8; INPUT.len()] = [0; INPUT.len()];
+                        let range = 100;
+                        for i in 0..range {
+                            if let Some(_) = WRITE_HANDLE.lock().unwrap().as_ref() {
+                                CHANNEL_TELNET_S.send(EventTelnet::Write(Arc::from(INPUT))).unwrap();
+                            } else {
+                                if i + 1 == range {
+                                    panic!("could not obtain a write handle");
+                                }
+                                thread::sleep(Duration::from_millis(5));
+                            }
+                        }
+                        stream.set_read_timeout(Some(Duration::from_secs(1))).unwrap();
+                        stream.read_exact(&mut buf).unwrap();
+                        assert_eq!(INPUT, &buf[..]);
+                        return ();
+                    }
+                    Err(_) => thread::sleep(Duration::from_millis(5)),
+                }
+            }
+
+            panic!("failed to connect to tcp stream");
+        }
     }
 }
