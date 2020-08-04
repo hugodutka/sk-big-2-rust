@@ -157,7 +157,7 @@ mod tests {
                             CHANNEL_TELNET_S.send(EventTelnet::Write(Arc::from(INPUT)))?;
                             break;
                         }
-                        if i == 9 {
+                        if i == 99 {
                             return Err(anyhow!("could not obtain a write handle"));
                         }
                         thread::sleep(Duration::from_millis(5));
