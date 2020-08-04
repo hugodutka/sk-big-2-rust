@@ -1,7 +1,8 @@
-for i in `seq 1 100`; do
-    cargo test > /dev/null 2>&1
+for i in `seq 1 1000`; do
+    out=$(cargo test 2>&1)
     if [ $? != 0 ]; then
         echo "wah, tests are flaky"
+        echo "$out"
     fi
     if [ $(($i % 5)) = 0 ]; then
         echo $i

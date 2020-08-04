@@ -44,6 +44,7 @@ impl TelnetServer<'_> {
                         if let Err(err) = self.handle_client(&mut stream) {
                             log!("TCP connection dropped: {:?}", err);
                         }
+                        *WRITE_HANDLE.lock().unwrap() = None;
                     }
                     Err(err) => log!("failed to unpack a new TCP stream: {:?}", err),
                 }
@@ -144,15 +145,16 @@ mod tests {
                 match TcpStream::connect((SERVER_HOST, SERVER_PORT + 2)) {
                     Ok(mut stream) => {
                         let mut buf: [u8; INPUT.len()] = [0; INPUT.len()];
-                        let range = 100;
+                        let range = 1000;
                         for i in 0..range {
                             if let Some(_) = WRITE_HANDLE.lock().unwrap().as_ref() {
                                 CHANNEL_TELNET_S.send(EventTelnet::Write(Arc::from(INPUT))).unwrap();
+                                break;
                             } else {
-                                if i + 1 == range {
-                                    panic!("could not obtain a write handle");
-                                }
                                 thread::sleep(Duration::from_millis(5));
+                            }
+                            if i + 1 == range {
+                                panic!("could not obtain a write handle");
                             }
                         }
                         stream.set_read_timeout(Some(Duration::from_secs(1))).unwrap();
