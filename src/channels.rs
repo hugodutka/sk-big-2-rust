@@ -1,4 +1,4 @@
-use crate::events::EventModel;
+use crate::events::{EventModel, EventTelnet};
 use crossbeam::crossbeam_channel::{unbounded, Receiver, Sender};
 use lazy_static::lazy_static;
 
@@ -9,6 +9,9 @@ lazy_static! {
     static ref CHANNEL_LOG: (Sender<String>, Receiver<String>) = unbounded();
     pub static ref CHANNEL_LOG_S: Sender<String> = CHANNEL_LOG.0.clone();
     pub static ref CHANNEL_LOG_R: Receiver<String> = CHANNEL_LOG.1.clone();
+    static ref CHANNEL_TELNET: (Sender<EventTelnet>, Receiver<EventTelnet>) = unbounded();
+    pub static ref CHANNEL_TELNET_S: Sender<EventTelnet> = CHANNEL_TELNET.0.clone();
+    pub static ref CHANNEL_TELNET_R: Receiver<EventTelnet> = CHANNEL_TELNET.1.clone();
 }
 
 #[cfg(test)]
@@ -37,8 +40,9 @@ pub mod tests {
     /// ```
     pub fn channel_test(f: fn() -> Result<()>) -> Result<()> {
         let _guard = TEST_MUTEX.lock().unwrap();
-        while let Ok(_) = CHANNEL_MODEL_R.try_recv() {}
         while let Ok(_) = CHANNEL_LOG_R.try_recv() {}
+        while let Ok(_) = CHANNEL_MODEL_R.try_recv() {}
+        while let Ok(_) = CHANNEL_TELNET_R.try_recv() {}
         return f();
     }
 }

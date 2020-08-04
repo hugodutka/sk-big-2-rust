@@ -1,16 +1,20 @@
-use crate::channels::CHANNEL_MODEL_S;
-use crate::events::EventModel;
+use crate::channels::{CHANNEL_MODEL_S, CHANNEL_TELNET_R};
+use crate::events::{EventModel, EventTelnet};
 use anyhow::{Context, Result};
+use lazy_static::lazy_static;
 use std::io::prelude::*;
 use std::net::{TcpListener, TcpStream};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 const BUFFER_SIZE: usize = 1024;
+
+lazy_static! {
+    static ref WRITE_HANDLE: Arc<Mutex<Option<TcpStream>>> = Arc::from(Mutex::new(None));
+}
 
 pub struct TelnetServer<'a> {
     host: &'a str,
     port: u16,
-    write_handle: Option<TcpStream>,
     buffer: [u8; BUFFER_SIZE],
 }
 
@@ -19,7 +23,6 @@ impl TelnetServer<'_> {
         TelnetServer {
             host,
             port,
-            write_handle: None,
             buffer: [0; BUFFER_SIZE],
         }
     }
@@ -28,10 +31,10 @@ impl TelnetServer<'_> {
         match || -> Result<()> {
             let listener = TcpListener::bind((self.host, self.port)).context("bind failed")?;
 
-            for stream in listener.incoming() {
-                match stream {
+            for result in listener.incoming() {
+                match result {
                     Ok(mut stream) => {
-                        self.write_handle = match stream.try_clone() {
+                        *WRITE_HANDLE.lock().unwrap() = match stream.try_clone() {
                             Ok(handle) => Some(handle),
                             Err(err) => {
                                 log!("failed to clone a TCP stream: {:?}", err);
@@ -55,6 +58,19 @@ impl TelnetServer<'_> {
         }
     }
 
+    pub fn start_writer() {
+        loop {
+            match CHANNEL_TELNET_R.recv().unwrap() {
+                EventTelnet::Write(data) => match WRITE_HANDLE.lock().unwrap().as_mut() {
+                    Some(handle) => handle
+                        .write_all(data.as_ref())
+                        .unwrap_or_else(|err| log!("telnet write failure: {:?}", err)),
+                    None => log!("tried to write when stream was None"),
+                },
+            }
+        }
+    }
+
     fn handle_client(&mut self, stream: &mut TcpStream) -> Result<()> {
         loop {
             let read_size = stream.read(&mut self.buffer).context("read failed")?;
@@ -70,7 +86,7 @@ impl TelnetServer<'_> {
 mod tests {
     use super::*;
     use crate::channels::tests::channel_test;
-    use crate::channels::CHANNEL_MODEL_R;
+    use crate::channels::{CHANNEL_MODEL_R, CHANNEL_TELNET_S};
     use adorn::adorn;
     use anyhow::{anyhow, Result};
     use std::thread;
@@ -120,5 +136,41 @@ mod tests {
             },
             _ => Err(anyhow!("expected a user input event")),
         }
+    }
+
+    #[test]
+    #[adorn(channel_test)]
+    fn telnet_writer_reacts_to_events() -> Result<()> {
+        const INPUT: &'static [u8] = &[6, 7, 8, 9, 10];
+
+        *WRITE_HANDLE.lock().unwrap() = None;
+
+        thread::spawn(|| TelnetServer::new(SERVER_HOST, SERVER_PORT).start());
+        thread::spawn(|| TelnetServer::start_writer());
+
+        for _ in 0..10 {
+            match TcpStream::connect((SERVER_HOST, SERVER_PORT)) {
+                Ok(mut stream) => {
+                    let mut buf: [u8; INPUT.len()] = [0; INPUT.len()];
+                    for i in 0..10 {
+                        if let Some(_) = WRITE_HANDLE.lock().unwrap().as_ref() {
+                            CHANNEL_TELNET_S.send(EventTelnet::Write(Arc::from(INPUT)))?;
+                            break;
+                        }
+                        if i == 9 {
+                            return Err(anyhow!("could not obtain a write handle"));
+                        }
+                        thread::sleep(Duration::from_millis(50));
+                    }
+                    stream.set_read_timeout(Some(Duration::from_secs(1)))?;
+                    stream.read_exact(&mut buf)?;
+                    assert_eq!(INPUT, &buf[..]);
+                    return Ok(());
+                }
+                Err(_) => thread::sleep(Duration::from_millis(50)),
+            }
+        }
+
+        return Err(anyhow!("failed to connect to tcp stream"));
     }
 }

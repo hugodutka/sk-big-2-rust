@@ -5,3 +5,8 @@ pub enum EventModel {
     UserInput(Arc<[u8]>),
     TelnetServerCrashed(Arc<str>),
 }
+
+#[derive(Debug)]
+pub enum EventTelnet {
+    Write(Arc<[u8]>),
+}
