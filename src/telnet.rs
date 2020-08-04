@@ -116,13 +116,13 @@ mod tests {
 
         thread::spawn(|| TelnetServer::new(SERVER_HOST, SERVER_PORT).start());
 
-        for _ in 0..10 {
+        for _ in 0..100 {
             match TcpStream::connect((SERVER_HOST, SERVER_PORT)) {
                 Ok(mut stream) => {
                     stream.write_all(&INPUT)?;
                     break;
                 }
-                Err(_) => thread::sleep(Duration::from_millis(50)),
+                Err(_) => thread::sleep(Duration::from_millis(5)),
             }
         }
 
@@ -148,11 +148,11 @@ mod tests {
         thread::spawn(|| TelnetServer::new(SERVER_HOST, SERVER_PORT).start());
         thread::spawn(|| TelnetServer::start_writer());
 
-        for _ in 0..10 {
+        for _ in 0..100 {
             match TcpStream::connect((SERVER_HOST, SERVER_PORT)) {
                 Ok(mut stream) => {
                     let mut buf: [u8; INPUT.len()] = [0; INPUT.len()];
-                    for i in 0..10 {
+                    for i in 0..100 {
                         if let Some(_) = WRITE_HANDLE.lock().unwrap().as_ref() {
                             CHANNEL_TELNET_S.send(EventTelnet::Write(Arc::from(INPUT)))?;
                             break;
@@ -160,7 +160,7 @@ mod tests {
                         if i == 9 {
                             return Err(anyhow!("could not obtain a write handle"));
                         }
-                        thread::sleep(Duration::from_millis(50));
+                        thread::sleep(Duration::from_millis(5));
                     }
                     stream.set_read_timeout(Some(Duration::from_secs(1)))?;
                     stream.read_exact(&mut buf)?;
