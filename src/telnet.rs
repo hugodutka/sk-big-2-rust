@@ -41,6 +41,9 @@ impl TelnetServer<'_> {
                                 continue;
                             }
                         };
+                        CHANNEL_MODEL_S
+                            .send(EventModel::NewTelnetConnection())
+                            .unwrap();
                         if let Err(err) = self.handle_client(&mut stream) {
                             log!("TCP connection dropped: {:?}", err);
                         }
@@ -123,6 +126,10 @@ mod tests {
                 }
             }
 
+            match CHANNEL_MODEL_R.recv_timeout(Duration::from_secs(1)) {
+                Ok(EventModel::NewTelnetConnection()) => (),
+                _ => panic!("expected a new connection event"),
+            }
             match CHANNEL_MODEL_R.recv_timeout(Duration::from_secs(1)) {
                 Ok(EventModel::UserInput(recv_input)) => match &recv_input[..] {
                     INPUT => (),

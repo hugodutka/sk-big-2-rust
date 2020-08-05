@@ -6,6 +6,7 @@ mod events;
 mod log;
 mod model;
 mod telnet;
+mod ui;
 
 use model::Model;
 

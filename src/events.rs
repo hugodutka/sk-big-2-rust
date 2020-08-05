@@ -4,6 +4,7 @@ use std::sync::Arc;
 pub enum EventModel {
     UserInput(Arc<[u8]>),
     TelnetServerCrashed(Arc<str>),
+    NewTelnetConnection(),
 }
 
 #[derive(Debug)]
