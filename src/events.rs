@@ -1,10 +1,14 @@
+use crate::proxy::ProxyMessage;
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 #[derive(Debug)]
 pub enum EventModel {
-    UserInput(Arc<[u8]>),
-    TelnetServerCrashed(Arc<str>),
     NewTelnetConnection(),
+    ProxyInput((SocketAddr, ProxyMessage)),
+    ProxyServerCrashed(Arc<str>),
+    TelnetServerCrashed(Arc<str>),
+    UserInput(Arc<[u8]>),
 }
 
 #[derive(Debug)]

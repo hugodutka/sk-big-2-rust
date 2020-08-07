@@ -33,6 +33,12 @@ impl Model {
                     ui::prepare_screen();
                     ui::render("hello!");
                 }
+                EventModel::ProxyServerCrashed(msg) => {
+                    return Err(anyhow!("proxy server crashed\n{}", msg))
+                }
+                EventModel::ProxyInput(msg) => {
+                    log!("new proxy input: {:?}", msg);
+                }
             }
         }
     }

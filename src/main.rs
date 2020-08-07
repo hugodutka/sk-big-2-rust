@@ -5,6 +5,7 @@ mod channels;
 mod events;
 mod log;
 mod model;
+mod proxy;
 mod telnet;
 mod ui;
 
