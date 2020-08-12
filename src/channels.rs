@@ -1,4 +1,4 @@
-use crate::events::{EventModel, EventTelnet};
+use crate::events::{EventModel, EventProxy, EventTelnet};
 use crossbeam::crossbeam_channel::{unbounded, Receiver, Sender};
 use lazy_static::lazy_static;
 
@@ -12,4 +12,7 @@ lazy_static! {
     static ref CHANNEL_TELNET: (Sender<EventTelnet>, Receiver<EventTelnet>) = unbounded();
     pub static ref CHANNEL_TELNET_S: Sender<EventTelnet> = CHANNEL_TELNET.0.clone();
     pub static ref CHANNEL_TELNET_R: Receiver<EventTelnet> = CHANNEL_TELNET.1.clone();
+    static ref CHANNEL_PROXY: (Sender<EventProxy>, Receiver<EventProxy>) = unbounded();
+    pub static ref CHANNEL_PROXY_S: Sender<EventProxy> = CHANNEL_PROXY.0.clone();
+    pub static ref CHANNEL_PROXY_R: Receiver<EventProxy> = CHANNEL_PROXY.1.clone();
 }

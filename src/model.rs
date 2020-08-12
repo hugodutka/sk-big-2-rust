@@ -1,6 +1,7 @@
 use crate::channels::CHANNEL_MODEL_R;
 use crate::events::EventModel;
 use crate::log::begin_logging;
+use crate::proxy;
 use crate::telnet::TelnetServer;
 use crate::ui;
 use anyhow::{anyhow, Result};
@@ -21,6 +22,8 @@ impl Model {
         thread::spawn(|| begin_logging());
         thread::spawn(move || TelnetServer::new("127.0.0.1", telnet_port).start());
         thread::spawn(|| TelnetServer::start_writer());
+        thread::spawn(|| proxy::start(("127.0.0.1", 14221)));
+        thread::spawn(|| proxy::start_writer());
 
         loop {
             match CHANNEL_MODEL_R.recv()? {
