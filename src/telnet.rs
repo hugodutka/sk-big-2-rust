@@ -34,13 +34,10 @@ impl TelnetServer<'_> {
             for result in listener.incoming() {
                 match result {
                     Ok(mut stream) => {
-                        *WRITE_HANDLE.lock().unwrap() = match stream.try_clone() {
-                            Ok(handle) => Some(handle),
-                            Err(err) => {
-                                log!("failed to clone a TCP stream: {:?}", err);
-                                continue;
-                            }
-                        };
+                        *WRITE_HANDLE.lock().unwrap() = Some(continue_on_err!(
+                            stream.try_clone(),
+                            "failed to clone a TCP stream"
+                        ));
                         CHANNEL_MODEL_S
                             .send(EventModel::NewTelnetConnection())
                             .unwrap();
