@@ -63,20 +63,11 @@ pub fn start<A: ToSocketAddrs>(addr: A) {
         let mut buf: [u8; 65535] = [0; 65535];
 
         loop {
-            let (size, src) = match socket.recv_from(&mut buf) {
-                Ok(result) => result,
-                Err(err) => {
-                    log!("failed to receive UDP message: {:?}", err);
-                    continue;
-                }
-            };
-            let msg = match parse_msg(&buf[..size]) {
-                Ok(result) => result,
-                Err(err) => {
-                    log!("failed to parse UDP message: {:?}", err);
-                    continue;
-                }
-            };
+            let (size, src) =
+                continue_on_err!(socket.recv_from(&mut buf), "failed to receive UDP message");
+
+            let msg = continue_on_err!(parse_msg(&buf[..size]), "failed to parse UDP message");
+
             CHANNEL_MODEL_S
                 .send(EventModel::ProxyInput((src, msg)))
                 .unwrap();
@@ -110,17 +101,11 @@ pub fn start_writer() {
                             OutgoingProxyMessage::Discover() => (message_codes::DISCOVER, &[]),
                             OutgoingProxyMessage::KeepAlive() => (message_codes::KEEPALIVE, &[]),
                         };
-                        let buf = match prepare_msg(code, content) {
-                            Ok(result) => result,
-                            Err(err) => {
-                                log!("failed to prepare message: {:?}", err);
-                                continue;
-                            }
-                        };
-                        if let Err(err) = socket.send_to(&buf[..], addr) {
-                            log!("failed to send message: {:?}", err);
-                            continue;
-                        }
+                        let buf = continue_on_err!(
+                            prepare_msg(code, content),
+                            "failed to prepare message"
+                        );
+                        continue_on_err!(socket.send_to(&buf[..], addr), "failed to send message");
                     }
                     None => log!("tried to write when socket was None"),
                 },

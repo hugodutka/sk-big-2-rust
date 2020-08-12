@@ -1,9 +1,12 @@
 use anyhow::Result;
 use std::{panic, process};
 
+// These modules contain macros. They must be declared before the others.
+#[rustfmt::skip] mod log;
+#[rustfmt::skip] mod util;
+
 mod channels;
 mod events;
-mod log;
 mod model;
 mod proxy;
 mod telnet;
