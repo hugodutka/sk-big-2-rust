@@ -1,0 +1,9 @@
+version: "3"
+services:
+  client1:
+    image: skclient-rust
+    command: cargo run
+  telnet:
+    image: mikesplain/telnet
+    entrypoint: /bin/sleep
+    command: 100000d
