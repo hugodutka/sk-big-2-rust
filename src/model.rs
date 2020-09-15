@@ -7,12 +7,18 @@ use crate::telnet::TelnetServer;
 use crate::ui;
 use crate::ui::UserInput;
 use anyhow::{anyhow, Result};
+use lazy_static::lazy_static;
+use regex::Regex;
 use std::cmp::{max, min};
 use std::io::stderr;
 use std::io::Write;
 use std::net::SocketAddr;
 use std::thread;
 use std::time::SystemTime;
+
+lazy_static! {
+    static ref METADATA_RE: Regex = Regex::new("StreamTitle='(.*)'").unwrap();
+}
 
 enum PostAction {
     Idle(),
@@ -110,7 +116,13 @@ impl Model {
                         }
                         IncomingProxyMessage::Metadata(meta) => {
                             match std::str::from_utf8(&*meta) {
-                                Ok(text) => proxy.meta = text.to_string(),
+                                Ok("") => (),
+                                Ok(text) => {
+                                    proxy.meta = match METADATA_RE.captures_iter(text).next() {
+                                        Some(cap) => cap[1].to_string(),
+                                        None => text.to_string(),
+                                    }
+                                }
                                 Err(err) => log!("could not parse metadata: {:?}", err),
                             }
                             PostAction::Render()
