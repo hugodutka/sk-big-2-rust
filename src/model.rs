@@ -8,6 +8,8 @@ use crate::ui;
 use crate::ui::UserInput;
 use anyhow::{anyhow, Result};
 use std::cmp::{max, min};
+use std::io::stderr;
+use std::io::Write;
 use std::net::SocketAddr;
 use std::thread;
 use std::time::SystemTime;
@@ -81,12 +83,44 @@ impl Model {
                     }
                     PostAction::Render()
                 }
-                EventModel::ProxyInput((_, msg)) => match msg {
-                    _ => {
-                        log!("got msg: {:?}", msg);
-                        PostAction::Render()
+                EventModel::ProxyInput((addr, msg)) => {
+                    let mut proxy = match self.proxies.iter_mut().find(|x| x.addr == addr) {
+                        Some(info) => {
+                            info.last_contact = SystemTime::now();
+                            info
+                        }
+                        None => {
+                            self.proxies.push(ProxyInfo {
+                                addr,
+                                last_contact: SystemTime::now(),
+                                info: "".to_string(),
+                                meta: "".to_string(),
+                            });
+                            self.proxies.last_mut().unwrap()
+                        }
+                    };
+                    match msg {
+                        IncomingProxyMessage::Audio(audio) => {
+                            if Some(addr) == self.active_proxy {
+                                if let Err(err) = stderr().write_all(&*audio) {
+                                    log!("could not print audio: {:?}", err);
+                                }
+                            }
+                            PostAction::Idle()
+                        }
+                        IncomingProxyMessage::Metadata(meta) => {
+                            match std::str::from_utf8(&*meta) {
+                                Ok(text) => proxy.meta = text.to_string(),
+                                Err(err) => log!("could not parse metadata: {:?}", err),
+                            }
+                            PostAction::Render()
+                        }
+                        IncomingProxyMessage::IAM(info) => {
+                            proxy.info = info.to_string();
+                            PostAction::Render()
+                        }
                     }
-                },
+                }
                 EventModel::NewTelnetConnection() => {
                     ui::prepare_screen();
                     PostAction::Render()

@@ -46,6 +46,12 @@ pub fn generate_ui(
         ))
     }
     rows.push("Koniec".to_string());
+    rows.push(
+        match proxies.iter().find(|x| Some(x.addr) == *active_proxy) {
+            Some(proxy) => proxy.meta.clone(),
+            None => "".to_string(),
+        },
+    );
     rows[cursor_line as usize].push_str(" <-");
     for row in &mut rows {
         row.push_str("\r\n");
