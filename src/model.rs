@@ -1,4 +1,4 @@
-use crate::channels::CHANNEL_MODEL_R;
+use crate::channels::{CHANNEL_MODEL_R, CHANNEL_MODEL_S};
 use crate::events::EventModel;
 use crate::log::begin_logging;
 use crate::proxy;
@@ -10,11 +10,11 @@ use anyhow::{anyhow, Result};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::cmp::{max, min};
-use std::io::stderr;
+use std::io::stdout;
 use std::io::Write;
 use std::net::SocketAddr;
 use std::thread;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 lazy_static! {
     static ref METADATA_RE: Regex = Regex::new("StreamTitle='(.*)'").unwrap();
@@ -59,6 +59,10 @@ impl Model {
         thread::spawn(|| TelnetServer::start_writer());
         thread::spawn(|| proxy::start("0.0.0.0:0"));
         thread::spawn(|| proxy::start_writer());
+        thread::spawn(|| loop {
+            CHANNEL_MODEL_S.send(EventModel::Tick()).unwrap();
+            thread::sleep(Duration::from_secs(1));
+        });
 
         loop {
             let post_action = match CHANNEL_MODEL_R.recv()? {
@@ -108,7 +112,7 @@ impl Model {
                     match msg {
                         IncomingProxyMessage::Audio(audio) => {
                             if Some(addr) == self.active_proxy {
-                                if let Err(err) = stderr().write_all(&*audio) {
+                                if let Err(err) = stdout().write_all(&*audio) {
                                     log!("could not print audio: {:?}", err);
                                 }
                             }
@@ -131,6 +135,26 @@ impl Model {
                             proxy.info = info.to_string();
                             PostAction::Render()
                         }
+                    }
+                }
+                EventModel::Tick() => {
+                    let now = SystemTime::now();
+                    let prev_length = self.proxies.len();
+                    self.proxies = self
+                        .proxies
+                        .drain(..)
+                        .filter(|x| match now.duration_since(x.last_contact) {
+                            Ok(dur) => dur < Duration::from_secs(5),
+                            Err(_) => true,
+                        })
+                        .collect();
+                    for p in &self.proxies {
+                        proxy::write(&p.addr, OutgoingProxyMessage::KeepAlive());
+                    }
+                    if prev_length == self.proxies.len() {
+                        PostAction::Idle()
+                    } else {
+                        PostAction::Render()
                     }
                 }
                 EventModel::NewTelnetConnection() => {

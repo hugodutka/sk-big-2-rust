@@ -9,6 +9,7 @@ pub enum EventModel {
     ProxyServerCrashed(Arc<str>),
     TelnetServerCrashed(Arc<str>),
     UserInput(Arc<[u8]>),
+    Tick(),
 }
 
 #[derive(Debug)]
