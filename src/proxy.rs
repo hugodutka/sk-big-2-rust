@@ -1,9 +1,9 @@
-use crate::channels::{CHANNEL_MODEL_S, CHANNEL_PROXY_R};
+use crate::channels::{CHANNEL_MODEL_S, CHANNEL_PROXY_R, CHANNEL_PROXY_S};
 use crate::events::{EventModel, EventProxy};
 use anyhow::{anyhow, Context, Result};
 use lazy_static::lazy_static;
 use std::convert::TryFrom;
-use std::net::{ToSocketAddrs, UdpSocket};
+use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::str::from_utf8;
 use std::sync::{Arc, Mutex};
 
@@ -42,8 +42,8 @@ fn parse_msg(msg: &[u8]) -> Result<IncomingProxyMessage> {
     let length: u16;
     unsafe {
         let msg_u16 = msg.as_ptr() as *mut u16;
-        code = *msg_u16;
-        length = *(msg_u16.add(1));
+        code = u16::from_be(*msg_u16);
+        length = u16::from_be(*(msg_u16.add(1)));
     }
     let content = &msg[HEADER_SIZE..(HEADER_SIZE + length as usize)];
     match code {
@@ -57,6 +57,7 @@ fn parse_msg(msg: &[u8]) -> Result<IncomingProxyMessage> {
 pub fn start<A: ToSocketAddrs>(addr: A) {
     match || -> Result<()> {
         let socket = UdpSocket::bind(&addr)?;
+        socket.set_broadcast(true).context("set broadcast failed")?;
         {
             *SOCKET.lock().unwrap() = Some(socket.try_clone()?);
         }
@@ -85,8 +86,8 @@ fn prepare_msg(code: u16, content: &[u8]) -> Result<Vec<u8>> {
     let length = u16::try_from(content.len()).context("content length must fit in u16")?;
     unsafe {
         let msg_u16 = msg.as_mut_ptr() as *mut u16;
-        *msg_u16 = code;
-        *(msg_u16.add(1)) = length;
+        *msg_u16 = code.to_be();
+        *(msg_u16.add(1)) = length.to_be();
     }
     for (i, val) in content.iter().enumerate() {
         msg[HEADER_SIZE + i] = *val;
@@ -120,6 +121,12 @@ pub fn start_writer() {
             .send(EventModel::ProxyServerCrashed(Arc::from(e.to_string())))
             .unwrap(),
     }
+}
+
+pub fn write(addr: &SocketAddr, msg: OutgoingProxyMessage) {
+    CHANNEL_PROXY_S
+        .send(EventProxy::Write((*addr, msg)))
+        .unwrap();
 }
 
 #[cfg(test)]
@@ -249,9 +256,7 @@ mod tests {
             let socket = UdpSocket::bind(socket_addr).unwrap();
 
             let msg = prepare_msg(message_codes::DISCOVER, &[]).unwrap();
-            CHANNEL_PROXY_S.send(
-                EventProxy::Write((socket_addr, OutgoingProxyMessage::Discover()))
-            ).unwrap();
+            write(&socket_addr, OutgoingProxyMessage::Discover());
 
             let mut buf = [0; 65535];
             socket.set_read_timeout(Some(Duration::from_secs(5))).unwrap();

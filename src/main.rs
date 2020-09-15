@@ -21,7 +21,7 @@ fn main() -> Result<()> {
         process::exit(1);
     }));
 
-    let model = Model::new(5100);
+    let mut model = Model::new(5100);
 
     model.start()?;
 
