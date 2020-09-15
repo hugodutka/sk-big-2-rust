@@ -2,8 +2,22 @@ version: "3"
 services:
   client1:
     image: skclient-rust
-    command: cargo run
+    command: sh -c './target/debug/skclient -H 255.255.255.255 -P 16000 -p 8000 > /home/hugodutka/data/out.mp3'
+    volumes:
+      - ./data/client1:/home/hugodutka/data/
   telnet:
     image: mikesplain/telnet
     entrypoint: /bin/sleep
     command: 100000d
+  proxy1:
+    image: sk-big-2
+    command: ./sk-big-2/radio-proxy "-h" "ant-waw-01.cdn.eurozet.pl" "-r" "/" "-p" "8602" "-m" "yes" "-P" "16000"
+  proxy2:
+    image: sk-big-2
+    command: ./sk-big-2/radio-proxy "-h" "waw02-03.ic.smcdn.pl" "-r" "/t050-1.mp3" "-p" "8000" "-m" "yes" "-P" "16000"
+  proxy3:
+    image: sk-big-2
+    command: ./sk-big-2/radio-proxy "-h" "78.31.65.20" "-r" "/dance.mp3" "-p" "8080" "-m" "yes" "-P" "16000"
+  proxy4:
+    image: sk-big-2
+    command: ./sk-big-2/radio-proxy "-h" "waw02-03.ic.smcdn.pl" "-r" "/t050-1.mp3" "-p" "8000" "-m" "yes" "-P" "16000"

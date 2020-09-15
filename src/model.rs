@@ -12,7 +12,7 @@ use regex::Regex;
 use std::cmp::{max, min};
 use std::io::stdout;
 use std::io::Write;
-use std::net::SocketAddr;
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::thread;
 use std::time::{Duration, SystemTime};
 
@@ -33,21 +33,29 @@ pub struct ProxyInfo {
 }
 
 pub struct Model {
-    telnet_port: u16,
-    input_buf: Vec<u8>,
-    cursor_line: i64,
-    proxies: Vec<ProxyInfo>,
     active_proxy: Option<SocketAddr>,
+    cursor_line: i64,
+    input_buf: Vec<u8>,
+    proxies: Vec<ProxyInfo>,
+    proxy_addr: SocketAddr,
+    telnet_port: u16,
+    timeout: u64,
 }
 
 impl Model {
-    pub fn new(telnet_port: u16) -> Model {
-        Model {
-            telnet_port,
-            input_buf: vec![],
-            cursor_line: 0,
-            proxies: vec![],
-            active_proxy: None,
+    pub fn new(proxy_host: &str, proxy_port: u16, telnet_port: u16, timeout: u64) -> Result<Model> {
+        if let Ok(mut addrs) = (proxy_host, proxy_port).to_socket_addrs() {
+            Ok(Model {
+                active_proxy: None,
+                cursor_line: 0,
+                input_buf: vec![],
+                proxies: vec![],
+                proxy_addr: addrs.next().unwrap(),
+                telnet_port,
+                timeout,
+            })
+        } else {
+            Err(anyhow!("Could not parse proxy address."))
         }
     }
 
@@ -72,10 +80,9 @@ impl Model {
                             UserInput::Up() => self.cursor_line -= 1,
                             UserInput::Down() => self.cursor_line += 1,
                             UserInput::Select() => match self.cursor_line {
-                                0 => proxy::write(
-                                    &SocketAddr::from(([255, 255, 255, 255], 16000)),
-                                    OutgoingProxyMessage::Discover(),
-                                ),
+                                0 => {
+                                    proxy::write(&self.proxy_addr, OutgoingProxyMessage::Discover())
+                                }
                                 _ if self.cursor_line == (self.proxies.len() + 1) as i64 => {
                                     return Ok(());
                                 }
@@ -140,11 +147,12 @@ impl Model {
                 EventModel::Tick() => {
                     let now = SystemTime::now();
                     let prev_length = self.proxies.len();
+                    let timeout = self.timeout;
                     self.proxies = self
                         .proxies
                         .drain(..)
                         .filter(|x| match now.duration_since(x.last_contact) {
-                            Ok(dur) => dur < Duration::from_secs(5),
+                            Ok(dur) => dur < Duration::from_secs(timeout),
                             Err(_) => true,
                         })
                         .collect();

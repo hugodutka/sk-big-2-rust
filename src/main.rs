@@ -6,12 +6,14 @@ use std::{panic, process};
 #[rustfmt::skip] mod util;
 
 mod channels;
+mod cmd;
 mod events;
 mod model;
 mod proxy;
 mod telnet;
 mod ui;
 
+use cmd::CmdArgs;
 use model::Model;
 
 fn main() -> Result<()> {
@@ -21,7 +23,13 @@ fn main() -> Result<()> {
         process::exit(1);
     }));
 
-    let mut model = Model::new(5100);
+    let args = CmdArgs::get();
+    let mut model = Model::new(
+        args.proxy_host.as_str(),
+        args.proxy_port,
+        args.telnet_port,
+        args.timeout,
+    )?;
 
     model.start()?;
 
