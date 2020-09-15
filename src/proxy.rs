@@ -158,8 +158,8 @@ mod tests {
         let msg = prepare_msg(code, &content).unwrap();
         unsafe {
             let msg_u16 = msg.as_ptr() as *const u16;
-            assert!(*msg_u16 == code);
-            assert!(*(msg_u16.add(1)) == content.len() as u16);
+            assert!(u16::from_be(*msg_u16) == code);
+            assert!(u16::from_be(*(msg_u16.add(1))) == content.len() as u16);
             let msg_u8 = msg.as_ptr() as *const u8;
             for (offset, val) in content.iter().enumerate() {
                 assert!(*(msg_u8.add(HEADER_SIZE + offset)) == *val);
